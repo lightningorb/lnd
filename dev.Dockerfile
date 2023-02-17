@@ -15,15 +15,16 @@ ENV GODEBUG netdns=cgo
 # Install dependencies.
 RUN apk add --no-cache --update alpine-sdk \
     git \
-    make 
+    make
 
 # Copy in the local repository to build from.
 COPY . /go/src/github.com/lightningnetwork/lnd
+COPY sample-lnd.conf /lnd.conf
 
 #  Install/build lnd.
 RUN cd /go/src/github.com/lightningnetwork/lnd \
 &&  make \
-&&  make install tags="signrpc walletrpc chainrpc invoicesrpc peersrpc"
+&&  make install tags="signrpc walletrpc chainrpc invoicesrpc peersrpc kvdb_sqlite"
 
 # Start a new, final image to reduce size.
 FROM alpine as final
@@ -31,13 +32,18 @@ FROM alpine as final
 # Expose lnd ports (server, rpc).
 EXPOSE 9735 10009
 
+RUN mkdir -p /root/.lnd/
+
 # Copy the binaries and entrypoint from the builder image.
 COPY --from=builder /go/bin/lncli /bin/
 COPY --from=builder /go/bin/lnd /bin/
+COPY --from=builder /lnd.conf /root/.lnd/
 
 # Add bash.
 RUN apk add --no-cache \
-    bash
+    bash \
+    sqlite \
+    sqlite-dev
 
 # Copy the entrypoint script.
 COPY "docker/lnd/start-lnd.sh" .

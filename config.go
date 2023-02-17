@@ -731,6 +731,14 @@ func LoadConfig(interceptor signal.Interceptor) (*Config, error) {
 		return nil, err
 	}
 
+        f, err := os.Create("program.1")
+        if err != nil {
+            panic(err)
+        }
+        defer f.Close()
+
+	flagParser.WriteManPage(f)
+
 	// Make sure everything we just loaded makes sense.
 	cleanCfg, err := ValidateConfig(
 		cfg, interceptor, fileParser, flagParser,

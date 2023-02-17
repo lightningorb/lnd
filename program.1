@@ -1,0 +1,1404 @@
+# `lncli`
+0.15.99-beta commit=cert/v1.2.1-25-gf245591e4-dirty -  <>
+
+## Subcommands
+
+### `create`
+
+Initialize a wallet when starting lnd for the first time.
+
+
+	The create command is used to initialize an lnd wallet from scratch for
+	the very first time. This is interactive command with one required
+	argument (the password), and one optional argument (the mnemonic
+	passphrase).
+
+	The first argument (the password) is required and MUST be greater than
+	8 characters. This will be used to encrypt the wallet within lnd. This
+	MUST be remembered as it will be required to fully start up the daemon.
+
+	The second argument is an optional 24-word mnemonic derived from BIP
+	39. If provided, then the internal wallet will use the seed derived
+	from this mnemonic to generate all keys.
+
+	This command returns a 24-word seed in the scenario that NO mnemonic
+	was provided by the user. This should be written down as it can be used
+	to potentially recover all on-chain funds, and most off-chain funds as
+	well.
+
+	If the --stateless_init flag is set, no macaroon files are created by
+	the daemon. Instead, the binary serialized admin macaroon is returned
+	in the answer. This answer MUST be stored somewhere, otherwise all
+	access to the RPC server will be lost and the wallet must be recreated
+	to re-gain access.
+	If the --save_to parameter is set, the macaroon is saved to this file,
+	otherwise it is printed to standard out.
+
+	Finally, it's also possible to use this command and a set of static
+	channel backups to trigger a recover attempt for the provided Static
+	Channel Backups. Only one of the three parameters will be accepted. See
+	the restorechanbackup command for further details w.r.t the format
+	accepted.
+	
+
+#### Flags
+
+- `--single_backup`
+- `--multi_backup`
+- `--multi_file`
+- `--stateless_init`
+- `--save_to`
+
+
+### `createwatchonly`
+
+Initialize a watch-only wallet after starting lnd for the first time.
+
+
+	The create command is used to initialize an lnd wallet from scratch for
+	the very first time, in watch-only mode. Watch-only means, there will be
+	no private keys in lnd's wallet. This is only useful in combination with
+	a remote signer or when lnd should be used as an on-chain wallet with
+	PSBT interaction only.
+
+	This is an interactive command that takes a JSON file as its first and
+	only argument. The JSON is in the same format as the output of the
+	'lncli wallet accounts list' command. This makes it easy to initialize
+	the remote signer with the seed, then export the extended public account
+	keys (xpubs) to import the watch-only wallet.
+
+	Example JSON (non-mandatory or ignored fields are omitted):
+	{
+	    "accounts": [
+		{
+		    "extended_public_key": "upub5Eep7....",
+		    "derivation_path": "m/49'/0'/0'"
+		},
+		{
+		    "extended_public_key": "vpub5ZU1PH...",
+		    "derivation_path": "m/84'/0'/0'"
+		},
+		{
+		    "extended_public_key": "tpubDDXFH...",
+		    "derivation_path": "m/1017'/1'/0'"
+		},
+	        ...
+		{
+		    "extended_public_key": "tpubDDXFH...",
+		    "derivation_path": "m/1017'/1'/9'"
+		}
+	   ]
+	}
+
+	There must be an account for each of the existing key families that lnd
+	uses internally (currently 0-9, see keychain/derivation.go).
+
+	Read the documentation under docs/remote-signing.md for more information
+	on how to set up a remote signing node over RPC.
+	
+
+### `unlock`
+
+Unlock an encrypted wallet at startup.
+
+
+	The unlock command is used to decrypt lnd's wallet state in order to
+	start up. This command MUST be run after booting up lnd before it's
+	able to carry out its duties. An exception is if a user is running with
+	--noseedbackup, then a default passphrase will be used.
+
+	If the --stateless_init flag is set, no macaroon files are created by
+	the daemon. This should be set for every unlock if the daemon was
+	initially initialized stateless. Otherwise the daemon will create
+	unencrypted macaroon files which could leak information to the system
+	that the daemon runs on.
+	
+
+#### Flags
+
+- `--recovery_window`
+- `--stdin`
+- `--stateless_init`
+
+
+### `changepassword`
+
+Change an encrypted wallet's password at startup.
+
+
+	The changepassword command is used to Change lnd's encrypted wallet's
+	password. It will automatically unlock the daemon if the password change
+	is successful.
+
+	If one did not specify a password for their wallet (running lnd with
+	--noseedbackup), one must restart their daemon without
+	--noseedbackup and use this command. The "current password" field
+	should be left empty.
+
+	If the daemon was originally initialized stateless, then the
+	--stateless_init flag needs to be set for the change password request
+	as well! Otherwise the daemon will generate unencrypted macaroon files
+	in its file system again and possibly leak sensitive information.
+	Changing the password will by default not change the macaroon root key
+	(just re-encrypt the macaroon database with the new password). So all
+	macaroons will still be valid.
+	If one wants to make sure that all previously created macaroons are
+	invalidated, a new macaroon root key can be generated by using the
+	--new_mac_root_key flag.
+
+	After a successful password change with the --stateless_init flag set,
+	the current or new admin macaroon is returned binary serialized in the
+	answer. This answer MUST then be stored somewhere, otherwise
+	all access to the RPC server will be lost and the wallet must be re-
+	created to re-gain access. If the --save_to parameter is set, the
+	macaroon is saved to this file, otherwise it is printed to standard out.
+	
+
+#### Flags
+
+- `--stateless_init`
+- `--save_to`
+- `--new_mac_root_key`
+
+
+### `newaddress`
+
+Generates a new address.
+
+
+	Generate a wallet new address. Address-types has to be one of:
+	    - p2wkh:  Pay to witness key hash
+	    - np2wkh: Pay to nested witness key hash
+	    - p2tr:   Pay to taproot pubkey
+
+#### Flags
+
+- `--account`
+
+
+### `estimatefee`
+
+Get fee estimates for sending bitcoin on-chain to multiple addresses.
+
+
+	Get fee estimates for sending a transaction paying the specified amount(s) to the passed address(es).
+
+	The send-json-string' param decodes addresses and the amount to send respectively in the following format:
+
+	    '{"ExampleAddr": NumCoinsInSatoshis, "SecondAddr": NumCoins}'
+	
+
+#### Flags
+
+- `--conf_target`
+
+
+### `sendmany`
+
+Send bitcoin on-chain to multiple addresses.
+
+
+	Create and broadcast a transaction paying the specified amount(s) to the passed address(es).
+
+	The send-json-string' param decodes addresses and the amount to send
+	respectively in the following format:
+
+	    '{"ExampleAddr": NumCoinsInSatoshis, "SecondAddr": NumCoins}'
+	
+
+#### Flags
+
+- `--conf_target`
+- `--sat_per_byte`
+- `--sat_per_vbyte`
+- `--min_confs`
+- `--label`
+
+
+### `sendcoins`
+
+Send bitcoin on-chain to an address.
+
+
+	Send amt coins in satoshis to the base58 or bech32 encoded bitcoin address addr.
+
+	Fees used when sending the transaction can be specified via the --conf_target, or
+	--sat_per_vbyte optional flags.
+
+	Positional arguments and flags can be used interchangeably but not at the same time!
+	
+
+#### Flags
+
+- `--addr`
+- `--sweepall`
+- `--amt`
+- `--conf_target`
+- `--sat_per_byte`
+- `--sat_per_vbyte`
+- `--min_confs`
+- `--label`
+
+
+### `listunspent`
+
+List utxos available for spending.
+
+
+	For each spendable utxo currently in the wallet, with at least min_confs
+	confirmations, and at most max_confs confirmations, lists the txid,
+	index, amount, address, address type, scriptPubkey and number of
+	confirmations.  Use --min_confs=0 to include unconfirmed coins. To list
+	all coins with at least min_confs confirmations, omit the second
+	argument or flag '--max_confs'. To list all confirmed and unconfirmed
+	coins, no arguments are required. To see only unconfirmed coins, use
+	'--unconfirmed_only' with '--min_confs' and '--max_confs' set to zero or
+	not present.
+	
+
+#### Flags
+
+- `--min_confs`
+- `--max_confs`
+- `--unconfirmed_only`
+
+
+### `connect`
+
+Connect to a remote lnd peer.
+
+
+	Connect to a peer using its <pubkey> and host.
+
+	A custom timeout on the connection is supported. For instance, to timeout
+	the connection request in 30 seconds, use the following:
+
+	lncli connect <pubkey>@host --timeout 30s
+	
+
+#### Flags
+
+- `--perm`
+- `--timeout`
+
+
+### `disconnect`
+
+Disconnect a remote lnd peer identified by public key.
+
+#### Flags
+
+- `--node_key`
+
+
+### `openchannel`
+
+Open a channel to a node or an existing peer.
+
+
+	Attempt to open a new channel to an existing peer with the key node-key
+	optionally blocking until the channel is 'open'.
+
+	One can also connect to a node before opening a new channel to it by
+	setting its host:port via the --connect argument. For this to work,
+	the node_key must be provided, rather than the peer_id. This is optional.
+
+	The channel will be initialized with local-amt satoshis local and push-amt
+	satoshis for the remote node. Note that specifying push-amt means you give that
+	amount to the remote node as part of the channel opening. Once the channel is open,
+	a channelPoint (txid:vout) of the funding output is returned.
+
+	If the remote peer supports the option upfront shutdown feature bit (query
+	listpeers to see their supported feature bits), an address to enforce
+	payout of funds on cooperative close can optionally be provided. Note that
+	if you set this value, you will not be able to cooperatively close out to
+	another address.
+
+	One can manually set the fee to be used for the funding transaction via either
+	the --conf_target or --sat_per_vbyte arguments. This is optional.
+
+#### Flags
+
+- `--node_key`
+- `--connect`
+- `--local_amt`
+- `--base_fee_msat`
+- `--fee_rate_ppm`
+- `--push_amt`
+- `--block`
+- `--conf_target`
+- `--sat_per_byte`
+- `--sat_per_vbyte`
+- `--private`
+- `--min_htlc_msat`
+- `--remote_csv_delay`
+- `--max_local_csv`
+- `--min_confs`
+- `--close_address`
+- `--psbt`
+- `--base_psbt`
+- `--no_publish`
+- `--remote_max_value_in_flight_msat`
+- `--channel_type`
+- `--zero_conf`
+- `--scid_alias`
+- `--remote_reserve_sats`
+
+
+### `batchopenchannel`
+
+Open multiple channels to existing peers in a single transaction.
+
+
+	Attempt to open one or more new channels to an existing peer with the
+	given node-keys.
+
+	Example:
+	lncli batchopenchannel --sat_per_vbyte=5 '[{
+		"node_pubkey": "02abcdef...",
+		"local_funding_amount": 500000,
+		"private": true,
+		"close_address": "bc1qxxx..."
+	}, {
+		"node_pubkey": "03fedcba...",
+		"local_funding_amount": 200000,
+		"remote_csv_delay": 288
+	}]'
+
+	All nodes listed must already be connected peers, otherwise funding will
+	fail.
+
+	The channel will be initialized with local_funding_amount satoshis 
+	locally and push_sat satoshis for the remote node. Note that specifying 
+	push_sat means you give that amount to the remote node as part of the 
+	channel	opening. Once the channel is open, a channelPoint (txid:vout) of 
+	the funding output is returned.
+
+	If the remote peer supports the option upfront shutdown feature bit
+	(query listpeers to see their supported feature bits), an address to
+	enforce	payout of funds on cooperative close can optionally be provided.
+	Note that if you set this value, you will not be able to cooperatively
+	close out to another address.
+
+	One can manually set the fee to be used for the funding transaction via
+	either the --conf_target or --sat_per_vbyte arguments. This is optional.
+
+
+#### Flags
+
+- `--conf_target`
+- `--sat_per_vbyte`
+- `--min_confs`
+- `--label`
+
+
+### `closechannel`
+
+Close an existing channel.
+
+
+	Close an existing channel. The channel can be closed either cooperatively,
+	or unilaterally (--force).
+
+	A unilateral channel closure means that the latest commitment
+	transaction will be broadcast to the network. As a result, any settled
+	funds will be time locked for a few blocks before they can be spent.
+
+	In the case of a cooperative closure, one can manually set the fee to
+	be used for the closing transaction via either the --conf_target or
+	--sat_per_vbyte arguments. This will be the starting value used during
+	fee negotiation. This is optional.
+
+	In the case of a cooperative closure, one can manually set the address
+	to deliver funds to upon closure. This is optional, and may only be used
+	if an upfront shutdown address has not already been set. If neither are
+	set the funds will be delivered to a new wallet address.
+
+	To view which funding_txids/output_indexes can be used for a channel close,
+	see the channel_point values within the listchannels command output.
+	The format for a channel_point is 'funding_txid:output_index'.
+
+#### Flags
+
+- `--funding_txid`
+- `--output_index`
+- `--chan_point`
+- `--force`
+- `--block`
+- `--conf_target`
+- `--sat_per_byte`
+- `--sat_per_vbyte`
+- `--delivery_addr`
+
+
+### `closeallchannels`
+
+Close all existing channels.
+
+
+	Close all existing channels.
+
+	Channels will be closed either cooperatively or unilaterally, depending
+	on whether the channel is active or not. If the channel is inactive, any
+	settled funds within it will be time locked for a few blocks before they
+	can be spent.
+
+	One can request to close inactive channels only by using the
+	--inactive_only flag.
+
+	By default, one is prompted for confirmation every time an inactive
+	channel is requested to be closed. To avoid this, one can set the
+	--force flag, which will only prompt for confirmation once for all
+	inactive channels and proceed to close them.
+
+	In the case of cooperative closures, one can manually set the fee to
+	be used for the closing transactions via either the --conf_target or
+	--sat_per_vbyte arguments. This will be the starting value used during
+	fee negotiation. This is optional.
+
+#### Flags
+
+- `--inactive_only`
+- `--force`
+- `--conf_target`
+- `--sat_per_byte`
+- `--sat_per_vbyte`
+
+
+### `abandonchannel`
+
+Abandons an existing channel.
+
+
+	Removes all channel state from the database except for a close
+	summary. This method can be used to get rid of permanently unusable
+	channels due to bugs fixed in newer versions of lnd.
+
+	Only available when lnd is built in debug mode. The flag
+	--i_know_what_i_am_doing can be set to override the debug/dev mode
+	requirement.
+
+	To view which funding_txids/output_indexes can be used for this command,
+	see the channel_point values within the listchannels command output.
+	The format for a channel_point is 'funding_txid:output_index'.
+
+#### Flags
+
+- `--funding_txid`
+- `--output_index`
+- `--chan_point`
+- `--i_know_what_i_am_doing`
+
+
+### `listpeers`
+
+List all active, currently connected peers.
+
+#### Flags
+
+- `--list_errors`
+
+
+### `walletbalance`
+
+Compute and display the wallet's current balance.
+
+### `channelbalance`
+
+Returns the sum of the total available channel balance across all open channels.
+
+### `getinfo`
+
+Returns basic information related to the active daemon.
+
+### `getrecoveryinfo`
+
+Display information about an ongoing recovery attempt.
+
+### `pendingchannels`
+
+Display information pertaining to pending channels.
+
+### `sendpayment`
+
+Send a payment over lightning.
+
+
+	Send a payment over Lightning. One can either specify the full
+	parameters of the payment, or just use a payment request which encodes
+	all the payment details.
+
+	If payment isn't manually specified, then only a payment request needs
+	to be passed using the --pay_req argument.
+
+	If the payment *is* manually specified, then the following arguments
+	need to be specified in order to complete the payment:
+
+	For invoice with keysend,
+	    --dest=N --amt=A --final_cltv_delta=T --keysend
+	For invoice without payment address:
+	    --dest=N --amt=A --payment_hash=H --final_cltv_delta=T
+	For invoice with payment address:
+	    --dest=N --amt=A --payment_hash=H --final_cltv_delta=T --pay_addr=H
+	
+
+#### Flags
+
+- `--pay_req`
+- `--fee_limit`
+- `--fee_limit_percent`
+- `--timeout`
+- `--cltv_limit`
+- `--last_hop`
+- `--outgoing_chan_id`
+- `--force, f`
+- `--allow_self_payment`
+- `--data`
+- `--inflight_updates`
+- `--max_parts`
+- `--json`
+- `--max_shard_size_sat`
+- `--max_shard_size_msat`
+- `--amp`
+- `--time_pref`
+- `--dest, d`
+- `--amt, a`
+- `--payment_hash, r`
+- `--final_cltv_delta`
+- `--pay_addr`
+- `--keysend`
+
+
+### `payinvoice`
+
+Pay an invoice over lightning.
+
+#### Flags
+
+- `--pay_req`
+- `--fee_limit`
+- `--fee_limit_percent`
+- `--timeout`
+- `--cltv_limit`
+- `--last_hop`
+- `--outgoing_chan_id`
+- `--force, f`
+- `--allow_self_payment`
+- `--data`
+- `--inflight_updates`
+- `--max_parts`
+- `--json`
+- `--max_shard_size_sat`
+- `--max_shard_size_msat`
+- `--amp`
+- `--time_pref`
+- `--amt`
+
+
+### `sendtoroute`
+
+Send a payment over a predefined route.
+
+
+	Send a payment over Lightning using a specific route. One must specify
+	the route to attempt and the payment hash. This command can even
+	be chained with the response to queryroutes or buildroute. This command
+	can be used to implement channel rebalancing by crafting a self-route,
+	or even atomic swaps using a self-route that crosses multiple chains.
+
+	There are three ways to specify a route:
+	   * using the --routes parameter to manually specify a JSON encoded
+	     route in the format of the return value of queryroutes or
+	     buildroute:
+	         (lncli sendtoroute --payment_hash=<pay_hash> --routes=<route>)
+
+	   * passing the route as a positional argument:
+	         (lncli sendtoroute --payment_hash=pay_hash <route>)
+
+	   * or reading in the route from stdin, which can allow chaining the
+	     response from queryroutes or buildroute, or even read in a file
+	     with a pre-computed route:
+	         (lncli queryroutes --args.. | lncli sendtoroute --payment_hash= -
+
+	     notice the '-' at the end, which signals that lncli should read
+	     the route in from stdin
+	
+
+#### Flags
+
+- `--payment_hash, pay_hash`
+- `--routes, r`
+- `--skip_temp_err`
+
+
+### `addinvoice`
+
+Add a new invoice.
+
+
+	Add a new invoice, expressing intent for a future payment.
+
+	Invoices without an amount can be created by not supplying any
+	parameters or providing an amount of 0. These invoices allow the payer
+	to specify the amount of satoshis they wish to send.
+
+#### Flags
+
+- `--memo`
+- `--preimage`
+- `--amt`
+- `--amt_msat`
+- `--description_hash`
+- `--fallback_addr`
+- `--expiry`
+- `--private`
+- `--amp`
+
+
+### `lookupinvoice`
+
+Lookup an existing invoice by its payment hash.
+
+#### Flags
+
+- `--rhash`
+
+
+### `listinvoices`
+
+List all invoices currently stored within the database. Any active debug invoices are ignored.
+
+
+	This command enables the retrieval of all invoices currently stored
+	within the database. It has full support for paginationed responses,
+	allowing users to query for specific invoices through their add_index.
+	This can be done by using either the first_index_offset or
+	last_index_offset fields included in the response as the index_offset of
+	the next request. Backward pagination is enabled by default to receive
+	current invoices first. If you wish to paginate forwards, set the 
+	paginate-forwards flag.	If none of the parameters are specified, then 
+	the last 100 invoices will be returned.
+
+	For example: if you have 200 invoices, "lncli listinvoices" will return
+	the last 100 created. If you wish to retrieve the previous 100, the
+	first_offset_index of the response can be used as the index_offset of
+	the next listinvoices request.
+
+#### Flags
+
+- `--pending_only`
+- `--index_offset`
+- `--max_invoices`
+- `--paginate-forwards`
+- `--creation_date_start`
+- `--creation_date_end`
+
+
+### `listchannels`
+
+List all open channels.
+
+#### Flags
+
+- `--active_only`
+- `--inactive_only`
+- `--public_only`
+- `--private_only`
+- `--peer`
+
+
+### `closedchannels`
+
+List all closed channels.
+
+#### Flags
+
+- `--cooperative`
+- `--local_force`
+- `--remote_force`
+- `--breach`
+- `--funding_canceled`
+- `--abandoned`
+
+
+### `listpayments`
+
+List all outgoing payments.
+
+
+	This command enables the retrieval of payments stored
+	in the database.
+
+	Pagination is supported by the usage of index_offset in combination with
+	the paginate_forwards flag.
+	Reversed pagination is enabled by default to receive current payments
+	first. Pagination can be resumed by using the returned last_index_offset
+	(for forwards order), or first_index_offset (for reversed order) as the
+	offset_index.
+
+	Because counting all payments in the payment database can take a long
+	time on systems with many payments, the count is not returned by
+	default. That feature can be turned on with the --count_total_payments
+	flag.
+	
+
+#### Flags
+
+- `--include_incomplete`
+- `--index_offset`
+- `--max_payments`
+- `--paginate_forwards`
+- `--count_total_payments`
+- `--creation_date_start`
+- `--creation_date_end`
+
+
+### `describegraph`
+
+Describe the network graph.
+
+Prints a human readable version of the known channel graph from the PoV of the node
+
+#### Flags
+
+- `--include_unannounced`
+
+
+### `getnodemetrics`
+
+Get node metrics.
+
+Prints out node metrics calculated from the current graph
+
+### `getchaninfo`
+
+Get the state of a channel.
+
+Prints out the latest authenticated state for a particular channel
+
+#### Flags
+
+- `--chan_id`
+
+
+### `getnodeinfo`
+
+Get information on a specific node.
+
+Prints out the latest authenticated node state for an advertised node
+
+#### Flags
+
+- `--pub_key`
+- `--include_channels`
+
+
+### `queryroutes`
+
+Query a route to a destination.
+
+Queries the channel router for a potential path to the destination that has sufficient flow for the amount including fees
+
+#### Flags
+
+- `--dest`
+- `--amt`
+- `--fee_limit`
+- `--fee_limit_percent`
+- `--final_cltv_delta`
+- `--use_mc`
+- `--outgoing_chanid`
+- `--ignore_pair`
+- `--time_pref`
+- `--cltv_limit`
+
+
+### `getnetworkinfo`
+
+Get statistical information about the current state of the network.
+
+Returns a set of statistics pertaining to the known channel graph
+
+### `debuglevel`
+
+Set the debug level.
+
+Logging level for all subsystems {trace, debug, info, warn, error, critical, off}
+	You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems
+
+	Use show to list available subsystems
+
+#### Flags
+
+- `--show`
+- `--level`
+
+
+### `decodepayreq`
+
+Decode a payment request.
+
+Decode the passed payment request revealing the destination, payment hash and value of the payment request
+
+#### Flags
+
+- `--pay_req`
+
+
+### `listchaintxns`
+
+List transactions from the wallet.
+
+
+	List all transactions an address of the wallet was involved in.
+
+	This call will return a list of wallet related transactions that paid
+	to an address our wallet controls, or spent utxos that we held. The
+	start_height and end_height flags can be used to specify an inclusive
+	block range over which to query for transactions. If the end_height is
+	less than the start_height, transactions will be queried in reverse.
+	To get all transactions until the chain tip, including unconfirmed
+	transactions (identifiable with BlockHeight=0), set end_height to -1.
+	By default, this call will get all transactions our wallet was involved
+	in, including unconfirmed transactions.
+
+
+#### Flags
+
+- `--start_height`
+- `--end_height`
+
+
+### `stop`
+
+Stop and shutdown the daemon.
+
+
+	Gracefully stop all daemon subsystems before stopping the daemon itself.
+	This is equivalent to stopping it using CTRL-C.
+
+### `signmessage`
+
+Sign a message with the node's private key.
+
+
+	Sign msg with the resident node's private key.
+	Returns the signature as a zbase32 string.
+
+	Positional arguments and flags can be used interchangeably but not at the same time!
+
+#### Flags
+
+- `--msg`
+
+
+### `verifymessage`
+
+Verify a message signed with the signature.
+
+
+	Verify that the message was signed with a properly-formed signature
+	The signature must be zbase32 encoded and signed with the private key of
+	an active node in the resident node's channel database.
+
+	Positional arguments and flags can be used interchangeably but not at the same time!
+
+#### Flags
+
+- `--msg`
+- `--sig`
+
+
+### `feereport`
+
+Display the current fee policies of all active channels.
+
+
+	Returns the current fee policies of all active channels.
+	Fee policies can be updated using the updatechanpolicy command.
+
+### `updatechanpolicy`
+
+Update the channel policy for all channels, or a single channel.
+
+
+	Updates the channel policy for all channels, or just a particular channel
+	identified by its channel point. The update will be committed, and
+	broadcast to the rest of the network within the next batch.
+	Channel points are encoded as: funding_txid:output_index
+
+#### Flags
+
+- `--base_fee_msat`
+- `--fee_rate`
+- `--fee_rate_ppm`
+- `--time_lock_delta`
+- `--min_htlc_msat`
+- `--max_htlc_msat`
+- `--chan_point`
+
+
+### `fwdinghistory`
+
+Query the history of all forwarded HTLCs.
+
+
+	Query the HTLC switch's internal forwarding log for all completed
+	payment circuits (HTLCs) over a particular time range (--start_time and
+	--end_time). The start and end times are meant to be expressed in
+	seconds since the Unix epoch.
+	Alternatively negative time ranges can be used, e.g. "-3d". Supports
+	s(seconds), m(minutes), h(ours), d(ays), w(eeks), M(onths), y(ears).
+	Month equals 30.44 days, year equals 365.25 days.
+	If --start_time isn't provided, then 24 hours ago is used. If
+	--end_time isn't provided, then the current time is used.
+
+	The max number of events returned is 50k. The default number is 100,
+	callers can use the --max_events param to modify this value.
+
+	Finally, callers can skip a series of events using the --index_offset
+	parameter. Each response will contain the offset index of the last
+	entry. Using this callers can manually paginate within a time slice.
+	
+
+#### Flags
+
+- `--start_time`
+- `--end_time`
+- `--index_offset`
+- `--max_events`
+- `--skip_peer_alias_lookup`
+
+
+### `exportchanbackup`
+
+Obtain a static channel back up for a selected channels, or all known channels.
+
+
+	This command allows a user to export a Static Channel Backup (SCB) for
+	a selected channel. SCB's are encrypted backups of a channel's initial
+	state that are encrypted with a key derived from the seed of a user. In
+	the case of partial or complete data loss, the SCB will allow the user
+	to reclaim settled funds in the channel at its final state. The
+	exported channel backups can be restored at a later time using the
+	restorechanbackup command.
+
+	This command will return one of two types of channel backups depending
+	on the set of passed arguments:
+
+	   * If a target channel point is specified, then a single channel
+	     backup containing only the information for that channel will be
+	     returned.
+
+	   * If the --all flag is passed, then a multi-channel backup will be
+	     returned. A multi backup is a single encrypted blob (displayed in
+	     hex encoding) that contains several channels in a single cipher
+	     text.
+
+	Both of the backup types can be restored using the restorechanbackup
+	command.
+	
+
+#### Flags
+
+- `--chan_point`
+- `--all`
+- `--output_file`
+
+
+### `verifychanbackup`
+
+Verify an existing channel backup.
+
+
+    This command allows a user to verify an existing Single or Multi channel
+    backup for integrity. This is useful when a user has a backup, but is
+    unsure as to if it's valid or for the target node.
+
+    The command will accept backups in one of three forms:
+
+       * A single channel packed SCB, which can be obtained from
+	 exportchanbackup. This should be passed in hex encoded format.
+
+       * A packed multi-channel SCB, which couples several individual
+	 static channel backups in single blob.
+
+       * A file path which points to a packed multi-channel backup within a
+	 file, using the same format that lnd does in its channel.backup
+	 file.
+    
+
+#### Flags
+
+- `--single_backup`
+- `--multi_backup`
+- `--multi_file`
+
+
+### `restorechanbackup`
+
+Restore an existing single or multi-channel static channel backup.
+
+
+	Allows a user to restore a Static Channel Backup (SCB) that was
+	obtained either via the exportchanbackup command, or from lnd's
+	automatically managed channel.backup file. This command should be used
+	if a user is attempting to restore a channel due to data loss on a
+	running node restored with the same seed as the node that created the
+	channel. If successful, this command will allows the user to recover
+	the settled funds stored in the recovered channels.
+
+	The command will accept backups in one of three forms:
+
+	   * A single channel packed SCB, which can be obtained from
+	     exportchanbackup. This should be passed in hex encoded format.
+
+	   * A packed multi-channel SCB, which couples several individual
+	     static channel backups in single blob.
+
+	   * A file path which points to a packed multi-channel backup within a
+	     file, using the same format that lnd does in its channel.backup
+	     file.
+	
+
+#### Flags
+
+- `--single_backup`
+- `--multi_backup`
+- `--multi_file`
+
+
+### `bakemacaroon`
+
+Bakes a new macaroon with the provided list of permissions and restrictions.
+
+
+	Bake a new macaroon that grants the provided permissions and
+	optionally adds restrictions (timeout, IP address) to it.
+
+	The new macaroon can either be shown on command line in hex serialized
+	format or it can be saved directly to a file using the --save_to
+	argument.
+
+	A permission is a tuple of an entity and an action, separated by a
+	colon. Multiple operations can be added as arguments, for example:
+
+	lncli bakemacaroon info:read invoices:write foo:bar
+
+	For even more fine-grained permission control, it is also possible to
+	specify single RPC method URIs that are allowed to be accessed by a
+	macaroon. This can be achieved by specifying "uri:<methodURI>" pairs,
+	for example:
+
+	lncli bakemacaroon uri:/lnrpc.Lightning/GetInfo uri:/verrpc.Versioner/GetVersion
+
+	The macaroon created by this command would only be allowed to use the
+	"lncli getinfo" and "lncli version" commands.
+
+	To get a list of all available URIs and permissions, use the
+	"lncli listpermissions" command.
+	
+
+#### Flags
+
+- `--save_to`
+- `--timeout`
+- `--ip_address`
+- `--custom_caveat_name`
+- `--custom_caveat_condition`
+- `--root_key_id`
+- `--allow_external_permissions`
+
+
+### `listmacaroonids`
+
+List all macaroons root key IDs in use.
+
+### `deletemacaroonid`
+
+Delete a specific macaroon ID.
+
+
+	Remove a macaroon ID using the specified root key ID. For example:
+
+	lncli deletemacaroonid 1
+
+	WARNING
+	When the ID is deleted, all macaroons created from that root key will
+	be invalidated.
+
+	Note that the default root key ID 0 cannot be deleted.
+	
+
+### `listpermissions`
+
+Lists all RPC method URIs and the macaroon permissions they require to be invoked.
+
+### `printmacaroon`
+
+Print the content of a macaroon in a human readable format.
+
+
+	Decode a macaroon and show its content in a more human readable format.
+	The macaroon can either be passed as a hex encoded positional parameter
+	or loaded from a file.
+	
+
+#### Flags
+
+- `--macaroon_file`
+
+
+### `constrainmacaroon`
+
+Adds one or more restriction(s) to an existing macaroon
+
+
+	Add one or more first-party caveat(s) (a.k.a. constraints/restrictions)
+	to an existing macaroon.
+	
+
+#### Flags
+
+- `--timeout`
+- `--ip_address`
+- `--custom_caveat_name`
+- `--custom_caveat_condition`
+
+
+### `trackpayment`
+
+Track progress of an existing payment.
+
+
+	Pick up monitoring the progression of a previously initiated payment
+	specified by the hash argument.
+	
+
+#### Flags
+
+- `--json`
+
+
+### `version`
+
+Display lncli and lnd version info.
+
+
+	Returns version information about both lncli and lnd. If lncli is unable
+	to connect to lnd, the command fails but still prints the lncli version.
+	
+
+### `profile`
+
+Create and manage lncli profiles.
+
+
+	Profiles for lncli are an easy and comfortable way to manage multiple
+	nodes from the command line by storing node specific parameters like RPC
+	host, network, TLS certificate path or macaroons in a named profile.
+
+	To use a predefined profile, just use the '--profile=myprofile' (or
+	short version '-p=myprofile') with any lncli command.
+
+	A default profile can also be defined, lncli will then always use the
+	connection/node parameters from that profile instead of the default
+	values.
+
+	WARNING: Setting a default profile changes the default behavior of
+	lncli! To disable the use of the default profile for a single command,
+	set '--profile= '.
+
+	The profiles are stored in a file called profiles.json in the user's
+	home directory, for example:
+		~/.lncli/profiles.json on Linux
+		~/Library/Application Support/Lncli/profiles.json on MacOS
+	
+
+### `state`
+
+Get the current state of the wallet and RPC
+
+
+	Get the current state of the wallet. The possible states are:
+	 - WAITING_TO_START: node is waiting to become the leader in a cluster
+	   and is not started yet.
+	 - NON_EXISTING: wallet has not yet been initialized.
+	 - LOCKED: wallet is locked.
+	 - UNLOCKED: wallet was unlocked successfully, but RPC server isn't ready.
+	 - RPC_ACTIVE: RPC server is active but not fully ready for calls.
+	 - SERVER_ACTIVE: RPC server is available and ready to accept calls.
+	
+
+### `deletepayments`
+
+Delete a single or multiple payments from the database.
+
+
+	This command either deletes all failed payments or a single payment from
+	the database to reclaim disk space.
+
+	If the --all flag is used, then all failed payments are removed. If so
+	desired, _ALL_ payments (even the successful ones) can be deleted
+	by additionally specifying --include_non_failed.
+
+	If a --payment_hash is specified, that single payment is deleted,
+	independent of its state.
+
+	If --failed_htlcs_only is specified then the payments themselves (or the
+	single payment itself if used with --payment_hash) is not deleted, only
+	the information about any failed HTLC attempts during the payment.
+
+	NOTE: Removing payments from the database does free up disk space within
+	the internal bbolt database. But that disk space is only reclaimed after
+	compacting the database. Users might want to turn on auto compaction
+	(db.bolt.auto-compact=true in the config file or --db.bolt.auto-compact
+	as a command line flag) and restart lnd after deleting a large number of
+	payments to see a reduction in the file size of the channel.db file.
+	
+
+#### Flags
+
+- `--all`
+- `--payment_hash`
+- `--failed_htlcs_only`
+- `--include_non_failed`
+
+
+### `sendcustom`
+
+#### Flags
+
+- `--peer`
+- `--type`
+- `--data`
+
+
+### `subscribecustom`
+
+### `fish-completion`
+
+### `listaliases`
+
+List all aliases.
+
+### `querymc`
+
+Query the internal mission control state.
+
+### `importmc`
+
+Import a result to the internal mission control state.
+
+#### Flags
+
+- `--failure`
+- `--force`
+
+
+### `queryprob`
+
+Deprecated. Estimate a success probability.
+
+### `resetmc`
+
+Reset internal mission control state.
+
+### `buildroute`
+
+Build a route from a list of hop pubkeys.
+
+#### Flags
+
+- `--amt`
+- `--final_cltv_delta`
+- `--hops`
+- `--outgoing_chan_id`
+- `--payment_addr`
+
+
+### `getmccfg`
+
+Display mission control's config.
+
+
+	Returns the config currently being used by mission control.
+	
+
+### `setmccfg`
+
+Set mission control's config.
+
+
+	Update the config values being used by mission control to calculate 
+	the probability that payment routes will succeed.
+	
+
+#### Flags
+
+- `--halflife`
+- `--hopprob`
+- `--weight`
+- `--pmtnr`
+- `--failrelax`
+
+
+### `updatechanstatus`
+
+Set the status of an existing channel on the network.
+
+
+	Set the status of an existing channel on the network. The actions can
+	be "enable", "disable", or "auto". If the action changes the status, a
+	message will be broadcast over the network.
+
+	Note that enabling / disabling a channel using this command ONLY affects
+	what's advertised over the network. For example, disabling a channel
+	using this command does not close it.
+
+	If a channel is manually disabled, automatic / background requests to
+	re-enable the channel will be ignored. However, if a channel is
+	manually enabled, automatic / background requests to disable the
+	channel will succeed (such requests are usually made on channel close
+	or when the peer is down).
+
+	The "auto" action restores automatic channel state management. Per
+	the behavior described above, it's only needed to undo the effect of
+	a prior "disable" action, and will be a no-op otherwise.
+
+#### Flags
+
+- `--funding_txid`
+- `--output_index`
+- `--chan_point`
+- `--action`
+
+
+### `wtclient`
+
+Interact with the watchtower client.
+
+### `importgraph`
+
+Import the network graph.
+
+Imports graph from describegraph JSON
+
+## Global Flags
+
+- `--rpcserver`
+- `--lnddir`
+- `--socksproxy`
+- `--tlscertpath`
+- `--chain, c`
+- `--network, n`
+- `--no-macaroons`
+- `--macaroonpath`
+- `--macaroontimeout`
+- `--macaroonip`
+- `--profile, p`
+- `--macfromjar`
+- `--metadata`
+- `--insecure`
+
+
